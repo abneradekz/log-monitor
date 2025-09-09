@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync" // <-- ADICIONADO: para sincronizar o acesso ao mapa
 	"time"
 
 	"cloud.google.com/go/logging"
@@ -25,8 +26,17 @@ type LogEntryPayload struct {
 	Labels      map[string]string      `json:"labels"`
 }
 
+// ---- ALTERAÇÃO PRINCIPAL AQUI ----
+// Mapa para rastrear arquivos que estão sendo processados e evitar duplicatas.
+// A chave é o caminho do arquivo, o valor é um booleano.
+var currentlyProcessing = make(map[string]bool)
+
+// Mutex para garantir que o acesso ao mapa seja seguro entre as goroutines.
+var processingMutex = &sync.Mutex{}
+
+// ------------------------------------
+
 func main() {
-	// Lendo todas as configurações a partir de variáveis de ambiente
 	gcpProjectID := os.Getenv("GCP_PROJECT_ID")
 	if gcpProjectID == "" {
 		log.Fatal("A variável de ambiente GCP_PROJECT_ID não foi definida.")
@@ -68,6 +78,18 @@ func main() {
 					return
 				}
 				if event.Op&fsnotify.Create == fsnotify.Create || event.Op&fsnotify.Write == fsnotify.Write {
+					// ---- ALTERAÇÃO AQUI: Lógica de Deduplicação ----
+					processingMutex.Lock() // Bloqueia o acesso ao mapa
+					if _, isProcessing := currentlyProcessing[event.Name]; isProcessing {
+						// Se o arquivo já está na lista, ignora este evento.
+						processingMutex.Unlock() // Libera o acesso
+						continue
+					}
+					// Se não está na lista, adiciona e envia para a fila.
+					currentlyProcessing[event.Name] = true
+					processingMutex.Unlock() // Libera o acesso
+					// ---------------------------------------------
+
 					info, err := os.Stat(event.Name)
 					if err == nil && !info.IsDir() {
 						log.Println("Novo arquivo detectado:", event.Name)
@@ -102,6 +124,14 @@ func main() {
 }
 
 func processLogFile(filePath string, logger *logging.Logger) {
+	// ---- ALTERAÇÃO AQUI: Remove o arquivo do mapa no final ----
+	defer func() {
+		processingMutex.Lock()
+		delete(currentlyProcessing, filePath)
+		processingMutex.Unlock()
+	}()
+	// -----------------------------------------------------------
+
 	time.Sleep(100 * time.Millisecond)
 
 	content, err := os.ReadFile(filePath)
@@ -123,11 +153,7 @@ func processLogFile(filePath string, logger *logging.Logger) {
 	}
 
 	logger.Log(entry)
-
-	// --- ALTERAÇÃO AQUI ---
-	// Simplificando a mensagem de log para remover a chamada logger.ID()
 	log.Printf("Log de %s enviado com sucesso.", filePath)
-	// --- FIM DA ALTERAÇÃO ---
 
 	if err := os.Remove(filePath); err != nil {
 		log.Printf("Erro ao remover o arquivo %s: %v", err)

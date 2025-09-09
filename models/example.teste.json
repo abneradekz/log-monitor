@@ -7,7 +7,6 @@
   },
   "jsonPayload": {
     "evento": "teste-inicial-do-servico",
-    "status": "sucesso",
-    "timestamp_unix": 1725898261
+    "status": "sucesso"
   }
 }
