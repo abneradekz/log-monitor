@@ -1,27 +1,25 @@
 # --- Build Stage ---
-# Usando a versão estável mais recente do Go para segurança e performance.
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# 1. Copia primeiro o arquivo de módulo.
-COPY go.mod ./
-COPY go.sum ./
-
-# 2. Copia o código fonte.
-COPY *.go ./
-
-# 3. Roda o 'tidy' para sincronizar o go.mod com o código fonte.
-# RUN go mod tidy
-
-# 4. Baixa as dependências.
+# Copia e prepara os arquivos de dependência
+COPY go.mod go.sum ./
 RUN go mod download
 
-# 5. Compila a aplicação, agora com todas as dependências disponíveis.
+# Copia o código fonte e compila
+COPY *.go ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o /log-shipper
 
 # --- Final Stage ---
+#FROM alpine:latest
 FROM scratch
+
+# ---- A MÁGICA ACONTECE AQUI ----
+# Copia o "bundle" de certificados de CA do estágio de build (que funciona)
+# para a imagem final. O programa Go automaticamente encontrará e usará este arquivo.
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# --------------------------------
 
 # Copia apenas o binário compilado
 COPY --from=builder /log-shipper /log-shipper

@@ -1,0 +1,26 @@
+{
+  "severity": "ERROR",
+  "message": "Falha ao processar o pagamento do usuário.",
+  "timestamp": "2025-09-08T14:30:00.123456789Z",
+  "labels": {
+    "application": "backend-pagamentos",
+    "module": "checkout",
+    "version": "1.2.5"
+  },
+  "jsonPayload": {
+    "userId": "user-12345",
+    "orderId": "order-abc-987",
+    "paymentMethod": "credit_card",
+    "errorDetails": {
+      "code": 5003,
+      "reason": "Insufficient funds"
+    }
+  },
+  "httpRequest": {
+    "requestMethod": "POST",
+    "requestUrl": "/api/v1/payments",
+    "status": 500,
+    "userAgent": "MobileApp/1.0",
+    "remoteIp": "192.0.2.1"
+  }
+}

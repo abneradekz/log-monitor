@@ -1,0 +1,13 @@
+{
+  "severity": "INFO",
+  "message": "Este é um teste de log para o serviço de pagamentos.",
+  "labels": {
+    "application": "backend-pagamentos",
+    "module": "teste"
+  },
+  "jsonPayload": {
+    "evento": "teste-inicial-do-servico",
+    "status": "sucesso",
+    "timestamp_unix": 1725898261
+  }
+}

@@ -3,21 +3,21 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"cloud.google.com/go/logging"
 	"github.com/fsnotify/fsnotify"
 )
 
+// Constante que não muda
 const (
-	logID     = "application-logs" // Nome do log que aparecerá no Google Logging
-	watchPath = "/logs"            // Pasta que será monitorada dentro do container
+	watchPath = "/logs"
 )
 
-// Estrutura do JSON que esperamos ler dos arquivos
+// Estrutura do JSON
 type LogEntryPayload struct {
 	Severity    logging.Severity       `json:"severity"`
 	Message     string                 `json:"message"`
@@ -26,16 +26,18 @@ type LogEntryPayload struct {
 }
 
 func main() {
-	// Lê o Project ID a partir da variável de ambiente
+	// Lendo todas as configurações a partir de variáveis de ambiente
 	gcpProjectID := os.Getenv("GCP_PROJECT_ID")
 	if gcpProjectID == "" {
 		log.Fatal("A variável de ambiente GCP_PROJECT_ID não foi definida.")
 	}
 
-	ctx := context.Background()
+	logID := os.Getenv("LOG_ID")
+	if logID == "" {
+		log.Fatal("A variável de ambiente LOG_ID não foi definida.")
+	}
 
-	// 1. Inicia o cliente do Google Logging
-	// A biblioteca gerencia o batching e o envio assíncrono automaticamente.
+	ctx := context.Background()
 	client, err := logging.NewClient(ctx, "projects/"+gcpProjectID)
 	if err != nil {
 		log.Fatalf("Falha ao criar cliente de logging: %v", err)
@@ -43,26 +45,21 @@ func main() {
 	defer client.Close()
 
 	logger := client.Logger(logID).StandardLogger(logging.Info)
-	logger.Println("Serviço de Log Shipper iniciado. Observando a pasta:", watchPath)
+	logger.Println("Serviço de Log Shipper iniciado.")
 
-	// 2. Cria o watcher para o sistema de arquivos
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal("Falha ao criar watcher:", err)
 	}
 	defer watcher.Close()
 
-	// Canal para processar arquivos de forma concorrente
-	fileQueue := make(chan string, 100) // Buffer de 100 arquivos
-
-	// 3. Inicia um "worker" para processar a fila de arquivos
+	fileQueue := make(chan string, 100)
 	go func() {
 		for filePath := range fileQueue {
 			processLogFile(filePath, client.Logger(logID))
 		}
 	}()
 
-	// 4. Goroutine principal que assiste os eventos do watcher
 	go func() {
 		for {
 			select {
@@ -70,10 +67,12 @@ func main() {
 				if !ok {
 					return
 				}
-				// Nos interessa apenas quando um arquivo é criado ou escrito.
 				if event.Op&fsnotify.Create == fsnotify.Create || event.Op&fsnotify.Write == fsnotify.Write {
-					log.Println("Novo arquivo detectado:", event.Name)
-					fileQueue <- event.Name // Adiciona o arquivo na fila para processamento
+					info, err := os.Stat(event.Name)
+					if err == nil && !info.IsDir() {
+						log.Println("Novo arquivo detectado:", event.Name)
+						fileQueue <- event.Name
+					}
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -84,21 +83,28 @@ func main() {
 		}
 	}()
 
-	// 5. Adiciona a pasta ao watcher
-	err = watcher.Add(watchPath)
-	if err != nil {
-		log.Fatal("Falha ao adicionar pasta ao watcher:", err)
+	log.Println("Iniciando varredura de subdiretórios em:", watchPath)
+	if err := filepath.Walk(watchPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			log.Printf("Adicionando diretório ao watcher: %s", path)
+			return watcher.Add(path)
+		}
+		return nil
+	}); err != nil {
+		log.Fatalf("Falha ao configurar o watcher recursivo: %v", err)
 	}
+	log.Println("Varredura e configuração do watcher concluídas.")
 
-	// Mantém o serviço rodando
 	<-make(chan struct{})
 }
 
 func processLogFile(filePath string, logger *logging.Logger) {
-	// Pequeno delay para garantir que a escrita no arquivo terminou
 	time.Sleep(100 * time.Millisecond)
 
-	content, err := ioutil.ReadFile(filePath)
+	content, err := os.ReadFile(filePath)
 	if err != nil {
 		log.Printf("Erro ao ler o arquivo %s: %v", filePath, err)
 		return
@@ -116,12 +122,14 @@ func processLogFile(filePath string, logger *logging.Logger) {
 		Labels:   payload.Labels,
 	}
 
-	// Envia o log. A biblioteca cuida do batching.
 	logger.Log(entry)
-	log.Printf("Log de %s enviado com sucesso.", filePath)
 
-	// Opcional: remover o arquivo após o processamento
+	// --- ALTERAÇÃO AQUI ---
+	// Simplificando a mensagem de log para remover a chamada logger.ID()
+	log.Printf("Log de %s enviado com sucesso.", filePath)
+	// --- FIM DA ALTERAÇÃO ---
+
 	if err := os.Remove(filePath); err != nil {
-		log.Printf("Erro ao remover o arquivo %s: %v", filePath, err)
+		log.Printf("Erro ao remover o arquivo %s: %v", err)
 	}
 }
