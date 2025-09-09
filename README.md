@@ -117,3 +117,15 @@ Para aproveitar ao máximo os recursos de filtragem e visualização do Google C
 * `labels` (Opcional): Um conjunto de pares chave-valor para indexação de alta performance. Use para metadados que identificam a origem do log, como a aplicação, o ambiente (dev/prod), a versão, etc. São ótimos para filtros rápidos.
 * `trace` (Opcional): Se você utiliza o Google Cloud Trace para rastreamento distribuído, este campo associa a entrada de log a um *trace* específico. Isso permite ver todos os logs de uma única requisição que passou por múltiplos microsserviços.
 * `httpRequest` (Opcional): Se o log está relacionado a uma requisição HTTP, preencher este campo com detalhes da requisição (método, URL, status, IP de origem) faz com que o Google Logging agrupe os logs por requisição, facilitando a análise.
+
+### Acessando logs no Google Cloud Logging
+
+1. Acesse o [Google Cloud Console](https://console.cloud.google.com/).
+2. Navegue até **Logging** > **Logs Explorer**.
+3. Use o nome do log que você configurou (padrão: `application-log`).
+   1. exemplo de filtro básico:
+      ```
+      logName="projects/[seu-projeto]/logs/[LOG_ID]"
+      ```
+   2. trocar `[seu-projeto]` pelo ID do seu projeto e `[LOG_ID]` pelo nome do log configurado no .env (padrão: `application-log`).
+4. Você pode usar consultas avançadas para filtrar logs com base em `severity`, `labels`, `jsonPayload`, etc.
