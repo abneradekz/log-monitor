@@ -1,0 +1,17 @@
+services:
+  log-shipper:
+    build: .
+    container_name: log-shipper
+    # Para autenticar com o Google Cloud a partir do Docker, a forma mais fácil
+    # é montar o arquivo de credenciais da sua service account.
+    # Crie uma service account com a role "Logs Writer" (Gravador de Registros de Acesso)
+    environment:
+      # Passa a variável para dentro do container. O Go vai ler com os.Getenv()
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      # A credencial continua sendo passada da mesma forma
+      - GOOGLE_APPLICATION_CREDENTIALS=/config/gcp-credentials.json
+    # O segredo está aqui: você mapeia a pasta do seu host para a pasta /logs dentro do container
+    volumes:
+      - ./gcp-credentials.json:/config/gcp-credentials.json:ro # :ro = read-only
+      - ./logs:/logs/pasta1
+      # Adicione quantas pastas quiser monitorar

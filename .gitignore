@@ -1,0 +1,5 @@
+*.json
+.idea/
+*.iml
+.env*
+!.env.example
