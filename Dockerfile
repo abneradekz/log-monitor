@@ -6,12 +6,13 @@ WORKDIR /app
 
 # 1. Copia primeiro o arquivo de módulo.
 COPY go.mod ./
+COPY go.sum ./
 
 # 2. Copia o código fonte.
 COPY *.go ./
 
 # 3. Roda o 'tidy' para sincronizar o go.mod com o código fonte.
-RUN go mod tidy
+# RUN go mod tidy
 
 # 4. Baixa as dependências.
 RUN go mod download
