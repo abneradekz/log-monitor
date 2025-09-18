@@ -110,6 +110,12 @@ Para aproveitar ao máximo os recursos de filtragem e visualização do Google C
 
 #### Detalhes dos Campos Principais:
 
+Referência: [LogEntry - Google Cloud Logging](https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry)
+
+Referência 2: [Structured Logging - Google Cloud](https://cloud.google.com/logging/docs/structured-logging)
+
+Referência 3: [Logging Severity Levels](https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity)
+
 * `severity` (Opcional): A severidade do log. Valores comuns: `DEFAULT`, `DEBUG`, `INFO`, `NOTICE`, `WARNING`, `ERROR`, `CRITICAL`, `ALERT`, `EMERGENCY`. Isso transforma seu log em uma entrada colorida e filtrável na UI do Google Logging.
 * `message` (Opcional): Uma mensagem de texto simples. Se você usar `jsonPayload`, este campo se torna menos importante, pois o Google Logging dá preferência ao conteúdo estruturado.
 * `jsonPayload` (Recomendado): **O campo mais importante para logs estruturados.** O conteúdo deste objeto JSON é totalmente indexado e pesquisável. Você pode expandir os campos na interface do Logging e criar filtros complexos como `jsonPayload.userId="user-12345"`.
