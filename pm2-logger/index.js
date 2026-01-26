@@ -41,7 +41,7 @@ pm2.connect(function(err) {
   }
 
   pm2.launchBus(function(err, bus) {
-    console.log('✅ Conectado ao PM2 Bus e escutando...');
+    console.log('✅ Conectado ao PM2 Bus e escutando... V.: 1.0.1');
 
     bus.on('log:out', (packet) => processLog(packet, 'INFO'));
     bus.on('log:err', (packet) => processLog(packet, 'ERROR'));
