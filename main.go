@@ -26,7 +26,6 @@ type LogEntryPayload struct {
 	Labels      map[string]string      `json:"labels"`
 }
 
-// ---- ALTERAÇÃO PRINCIPAL AQUI ----
 // Mapa para rastrear arquivos que estão sendo processados e evitar duplicatas.
 // A chave é o caminho do arquivo, o valor é um booleano.
 var currentlyProcessing = make(map[string]bool)
@@ -105,20 +104,37 @@ func main() {
 		}
 	}()
 
-	log.Println("Iniciando varredura de subdiretórios em:", watchPath)
+	log.Println("Iniciando varredura de arquivos existentes em:", watchPath)
 	if err := filepath.Walk(watchPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
+
+		// 1. Se for diretório, adiciona ao watcher
 		if info.IsDir() {
 			log.Printf("Adicionando diretório ao watcher: %s", path)
 			return watcher.Add(path)
 		}
+
+		// 2. Se for arquivo, processa imediatamente (backlog)
+		// Usamos a mesma lógica de mutex para evitar conflito caso o watcher
+		// dispare um evento ao mesmo tempo (raro para arquivos existentes, mas seguro).
+		processingMutex.Lock()
+		if _, isProcessing := currentlyProcessing[path]; isProcessing {
+			processingMutex.Unlock()
+			return nil
+		}
+		currentlyProcessing[path] = true
+		processingMutex.Unlock()
+
+		log.Println("Processando arquivo legado (existente):", path)
+		fileQueue <- path
+
 		return nil
 	}); err != nil {
 		log.Fatalf("Falha ao configurar o watcher recursivo: %v", err)
 	}
-	log.Println("Varredura e configuração do watcher concluídas.")
+	log.Println("Varredura inicial concluída. Aguardando novos arquivos...")
 
 	<-make(chan struct{})
 }
