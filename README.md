@@ -26,7 +26,7 @@ O serviço opera de forma assíncrona e concorrente para garantir máxima efici�
 
 1.  **Docker e Docker Compose:** [Instruções de Instalação](https://docs.docker.com/get-docker/).
 2.  **Conta no Google Cloud Platform (GCP):** Com um projeto criado.
-3.  **Service Account (Conta de Serviço):** É necessário criar uma Service Account no seu projeto GCP com a role (papel) de **"Gravador de Registros de Acesso" (`roles/logging.logWriter`)**.
+3.  **Service Account (Conta de Serviço):** É necessário criar uma Service Account no seu projeto GCP com a role (papel) de **"Gravador de Registros" (`roles/logging.logWriter`)**.
     * Após criar a conta, gere uma chave do tipo JSON e faça o download.
 
 ## Configuração
@@ -128,10 +128,10 @@ Referência 3: [Logging Severity Levels](https://cloud.google.com/logging/docs/r
 
 1. Acesse o [Google Cloud Console](https://console.cloud.google.com/).
 2. Navegue até **Logging** > **Logs Explorer**.
-3. Use o nome do log que você configurou (padrão: `application-log`).
+3. Use o nome do log que você configurou (padrão: `applications-logs`).
    1. exemplo de filtro básico:
       ```
       logName="projects/[seu-projeto]/logs/[LOG_ID]"
       ```
-   2. trocar `[seu-projeto]` pelo ID do seu projeto e `[LOG_ID]` pelo nome do log configurado no .env (padrão: `application-log`).
+   2. trocar `[seu-projeto]` pelo ID do seu projeto e `[LOG_ID]` pelo nome do log configurado no .env (padrão: `applications-logs`).
 4. Você pode usar consultas avançadas para filtrar logs com base em `severity`, `labels`, `jsonPayload`, etc.
