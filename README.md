@@ -59,12 +59,12 @@ Com o Docker em execução, suba o serviço com o Docker Compose:
 ```bash
 # O comando --build garante que a imagem será construída na primeira vez
 # O -d (detached) faz com que o container rode em segundo plano
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
 Para ver os logs do próprio serviço de coleta, você pode usar:
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ## Como Usar
