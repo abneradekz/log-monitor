@@ -69,7 +69,7 @@ function processLog(packet, severity) {
     }
   };
 
-  const fileName = `${Date.now()}-${uuidv4()}.json`;
+  const fileName = `${packet.process.name}-${Date.now()}-${uuidv4()}.json`;
   const filePath = path.join(LOG_DIR, fileName);
 
   fs.writeFile(filePath, JSON.stringify(logEntry, null, 2), (err) => {
