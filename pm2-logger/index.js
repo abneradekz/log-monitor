@@ -7,6 +7,9 @@ const { v4: uuidv4 } = require('uuid');
 // 1. Configurações
 const LOG_DIR = process.env.LOG_OUTPUT_PATH || '../logs';
 
+// 2. Nome
+const SERVICE_NAME = process.env.SERVICE_NAME || 'pm2-listener';
+
 // Processa a lista de apps do .env
 const TARGET_APPS = (process.env.PM2_APPS_TO_MONITOR || '')
   .split(',')
@@ -55,16 +58,24 @@ function processLog(packet, severity) {
     return;
   }
 
+  let message = `${packet.process.name}-${packet.process.pm_id}: ${packet.data}`.substr(0, 150);
+  // explode no espaço para evitar cortar palavras no meio
+  const words = message.split(' ');
+  if (words.length > 1) {
+    message = words.slice(0, -1).join(' ') + '...';
+  }
+
   const logEntry = {
     severity: severity,
     jsonPayload: {
-      message: packet.data,
+      message: message,
+      data: packet.data,
       process_name: packet.process.name,
       pm_id: packet.process.pm_id,
       timestamp: new Date().toISOString()
     },
     labels: {
-      source: "pm2-listener",
+      source: SERVICE_NAME,
       environment: process.env.NODE_ENV || "production"
     }
   };
