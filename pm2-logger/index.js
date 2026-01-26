@@ -58,7 +58,9 @@ function processLog(packet, severity) {
     return;
   }
 
-  let message = `${packet.process.name}-${packet.process.pm_id}: ${packet.data}`.substr(0, 150);
+  const name = (packet.process.name || 'unknown').substr(0, 10).padEnd(10, ' ');
+
+  let message = `${packet.process.pm_id}|${name}| ${packet.data}`.substr(0, 150);
   // explode no espaço para evitar cortar palavras no meio
   const words = message.split(' ');
   if (words.length > 1) {
