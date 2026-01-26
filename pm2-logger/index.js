@@ -57,8 +57,8 @@ function processLog(packet, severity) {
 
   const logEntry = {
     severity: severity,
-    message: packet.data,
     jsonPayload: {
+      message: packet.data,
       process_name: packet.process.name,
       pm_id: packet.process.pm_id,
       timestamp: new Date().toISOString()
