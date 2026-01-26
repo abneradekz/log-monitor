@@ -1,4 +1,8 @@
 *.json
+!package.json
+!package-lock.json
+!yarn.lock
+!pnpm-lock.yaml
 .idea/
 *.iml
 .env
