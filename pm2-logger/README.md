@@ -1,93 +1,159 @@
-# **PM2 Log Listener & JSON Dumper**
+# **PM2 Logger Config Generator**
 
-Este serviço atua como um *middleware* de observabilidade local. Ele se conecta ao **PM2 Interactor Bus** em memória, intercepta logs (stdout e stderr) de aplicações específicas e os persiste como arquivos JSON estruturados.  
-O objetivo principal é servir como **produtor** para agentes de log (como Log Shippers em Go) que monitoram diretórios via fsnotify, desacoplando a coleta de logs do envio para a nuvem.
+Este repositório contém um utilitário para gerar arquivos de configuração do rsyslog para monitoramento de processos PM2, facilitando a integração com o **Google Cloud Ops Agent** e outros sistemas de monitoramento via Syslog.
 
-## **🚀 Funcionalidades**
+## **🛠 Script de Geração de Configuração**
 
-* **Interceptação em Tempo Real:** Escuta o barramento do PM2 sem necessidade de ler arquivos de log brutos do disco.
-* **Whitelisting de Processos:** Monitora apenas os aplicativos definidos explicitamente no .env.
-* **Estrutura GCP-Ready:** Gera JSONs já formatados com severity, jsonPayload e labels compatíveis com o Google Cloud Logging.
-* **Atomicidade:** Cada linha de log gera um arquivo único (com UUID) para garantir que o *watcher* do consumidor detecte o evento Create sem conflitos de *lock*.
-* **Fail Fast:** O serviço se recusa a iniciar se não houver aplicações configuradas para monitoramento.
+O script `create_logger_config.sh` facilita a criação de arquivos de configuração baseados em um modelo padrão (`pm2-logger.model`).
 
-## **📋 Pré-requisitos**
+### **✅ Funcionalidades**
 
-* Node.js (v14 ou superior)
-* PM2 instalado globalmente (npm install \-g pm2)
-* Ambiente Linux/WSL (recomendado)
+* Cria automaticamente a estrutura de diretórios.  
+* Gera arquivos de configuração `.conf` personalizados.  
+* Suporta execução em lote (múltiplos processos).  
+* Modo interativo inteligente para inserção de múltiplos processos.  
+* Utiliza um template (`pm2-logger.model`) para padronização.
 
-## **⚙️ Instalação e Configuração**
+### **🚀 Como Usar o Gerador**
 
-### **1\. Clone o repositório e instale as dependências**
+#### **1. Modo em Lote (Batch)**
 
-npm install
+Execute o script passando o nome da pasta seguido pelos nomes dos processos:
+```bash
+./create_logger_config.sh <nome_da_pasta> [processo1] [processo2] ...
+```
 
-### **2\. Configure as variáveis de ambiente**
+**Exemplo:**  
+```bash
+./create_logger_config.sh api-logs backend-api worker-jobs notification-service
+```
 
-Crie um arquivo .env na raiz do projeto com o seguinte conteúdo:  
-\# Diretório onde os JSONs serão salvos (o Agente Go deve escutar esta pasta)  
-LOG\_OUTPUT\_PATH=./pm2\_logs\_queue
+Isso criará a pasta `api-logs` e três arquivos de configuração dentro dela, um para cada processo.
 
-\# Lista de processos do PM2 para monitorar (nomes exatos, separados por vírgula)  
-\# Exemplo: backend-api, nextjs-front, worker-jobs  
-PM2\_APPS\_TO\_MONITOR=nome-do-app-1,nome-do-app-2
+#### **2. Modo Interativo**
 
-\# Metadado de ambiente (opcional)  
-NODE\_ENV=production
+Se você executar o script apenas com o nome da pasta (ou sem argumentos), ele entrará em um loop solicitando os nomes:
+```bash
+./create_logger_config.sh minhapasta
+```
 
-**Nota Crítica:** Se PM2\_APPS\_TO\_MONITOR estiver vazio ou não definido, o serviço encerrará imediatamente com erro (Exit Code 1\) para evitar execução ociosa.
+O script pedirá:
 
-## **▶️ Como Executar**
+1. `Digite o nome da pasta:` (se não fornecido)  
+2. `Digite o nome do processo:` (pressione Enter após cada nome)  
+3. Para finalizar e gerar os arquivos, pressione **Enter** sem digitar nada.
 
-Utilize o script start.sh incluído para gerenciar o ciclo de vida do processo no PM2. Ele cuida automaticamente da instalação de dependências, validação do arquivo .env e aplica um *reload* inteligente se o processo já estiver rodando.
+## **📦 Instalação e Ativação**
 
-### **Opção 1: Iniciar com nome padrão**
+Após gerar os arquivos `.conf`, siga os passos abaixo para ativar o envio dos logs para o Syslog/Google Cloud.
 
-O nome padrão do processo no PM2 será pm2-log-listener.  
-./start.sh
+### **1. Mover os arquivos de configuração**
 
-### **Opção 2: Iniciar com nome personalizado**
+Mova os arquivos gerados (`.conf`) para o diretório de configuração do Rsyslog:  
+```bash
+# Exemplo: copiando da pasta gerada 'api-logs'  
+sudo cp api-logs/*.conf /etc/rsyslog.d/
+```
 
-Isso é útil se você precisa rodar múltiplas instâncias desse script na mesma máquina, monitorando grupos de aplicações diferentes.  
-./start.sh meu-monitor-customizado
+### **2. Ajustar Permissões (Crítico)**
 
-## **📦 Formato do Output**
+O Rsyslog roda com um usuário restrito (`syslog`) e, por padrão, não consegue ler logs dentro da pasta `/root/.pm2/`. É necessário liberar a leitura:  
+```bash
+# Libera acesso de execução aos diretórios pais  
+sudo chmod 711 /root  
+sudo chmod 711 /root/.pm2
 
-Os arquivos gerados na pasta LOG\_OUTPUT\_PATH seguem o padrão de nomenclatura TIMESTAMP-UUID.json.  
-**Exemplo de conteúdo gerado:**  
-{  
-"severity": "INFO",  
-"message": "Usuário 123 logou com sucesso",  
-"jsonPayload": {  
-"process\_name": "backend-api",  
-"pm\_id": 4,  
-"timestamp": "2025-10-25T14:30:00.000Z"  
-},  
-"labels": {  
-"source": "pm2-listener",  
-"environment": "production"  
-}  
-}
+# Libera leitura na pasta de logs e nos arquivos  
+sudo chmod 755 /root/.pm2/logs  
+sudo chmod 644 /root/.pm2/logs/*.log
+```
 
-## **🛠 Integração com Agente Go (Log Shipper)**
+### **3. Reiniciar o Rsyslog**
 
-Se você estiver utilizando um agente externo (ex: em Go) para enviar esses logs para o Google Cloud Platform (GCP):
+Aplique as alterações reiniciando o serviço:  
+```bash
+sudo systemctl restart rsyslog
+```
 
-1. **Caminho:** Aponte o agente Go para monitorar a mesma pasta definida em LOG\_OUTPUT\_PATH.
-2. **Estrutura:** O JSON gerado casa perfeitamente com a struct LogEntryPayload (Severity, Message, JsonPayload).
-3. **Eventos:** O uso de arquivos únicos com UUID garante que o evento fsnotify.Create seja disparado corretamente no Go para cada linha de log, evitando condições de corrida (race conditions).
+## **🔍 Verificação**
 
-## **🐛 Troubleshooting**
+### **Verificar Localmente**
 
-**O serviço não inicia:**
+Para confirmar se o Rsyslog está capturando os dados, monitore o syslog filtrando pela tag do seu processo (ex: `pm2-backend-api`):
+```bash
+tail -f /var/log/syslog | grep "pm2-backend-api"
+```
 
-* Verifique se o arquivo .env foi criado.
-* Verifique se PM2\_APPS\_TO\_MONITOR possui pelo menos um nome de app válido.
+*Gere algum log na sua aplicação. Se aparecer aqui, a configuração está correta.*
 
-**Logs não aparecem na pasta de saída:**
+### **Verificar no Google Cloud**
 
-* Verifique se os nomes no .env batem *exatamente* (case-sensitive) com os nomes listados no comando pm2 list.
-* Verifique se o usuário que roda o script tem permissões de escrita na pasta de destino.
-* Consulte os logs do próprio listener para ver erros de execução:  
-  pm2 logs pm2-log-listener  
+Se o **Google Cloud Ops Agent** estiver instalado, os logs aparecerão automaticamente no **Logs Explorer**.
+
+1. Vá ao Google Cloud Console > Logging.  
+2. Filtre pela tag configurada:
+    ```bash
+    jsonPayload.syslog_tag="pm2-backend-api"
+    ```
+
+### **📁 Estrutura de Arquivos do Projeto**
+
+* **create_logger_config.sh**: O script gerador.  
+* **pm2-logger.model**: O template base (placeholders são substituídos pelo nome do processo).  
+* **.gitignore**: Ignora arquivos `.conf` gerados para evitar commits acidentais.
+
+# 
+# 
+# Quando não tiver chegando os logs
+## **Verificação e Instalação do Google Cloud Ops Agent**
+
+Este procedimento descreve como verificar se o Agente de Operações do Google Cloud (Ops Agent) está instalado e como instalá-lo caso não esteja.
+
+### **1. Verificar Status do Agente**
+
+Antes de instalar, verifique se o agente já está em execução no servidor.  
+**Para Linux:**  
+Execute o seguinte comando para verificar o status do serviço:  
+```bash
+sudo systemctl status google-cloud-ops-agent
+```
+
+* **Se estiver instalado:** Você verá um status `active (running)`.  
+* **Se não estiver instalado:** O comando retornará um erro `Unit google-cloud-ops-agent.service could not be found` ou similar.
+
+### **2. Instalar o Agente (Caso não tenha)**
+
+Se o agente não estiver instalado, utilize o script oficial de instalação do Google. Este script adiciona o repositório do agente e realiza a instalação.  
+**Passo a passo para Linux (Debian, Ubuntu, CentOS, RHEL):**
+
+1. Baixe o script de instalação do repositório:
+    ```bash
+    curl -sSO [https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh](https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh)
+    ```
+
+2. Execute o script para adicionar o repositório e instalar o agente:  
+    ```bash
+    sudo bash add-google-cloud-ops-agent-repo.sh --also-install
+    ```
+
+3. (Opcional) Verifique se a instalação foi bem-sucedida verificando o status novamente:  
+    ```bash
+    sudo systemctl status google-cloud-ops-agent"*"
+    ```
+
+### **3. Configuração Padrão**
+
+Após a instalação, o agente começa a coletar automaticamente:
+
+* Métricas de host (CPU, Memória, Disco, Rede).  
+* Logs do sistema (`syslog` no Linux ou Event Log no Windows).
+
+O arquivo de configuração principal fica localizado em:
+
+* **Linux:** `/etc/google-cloud-ops-agent/config.yaml`
+
+Se precisar reiniciar o agente após uma mudança de configuração:  
+sudo systemctl restart google-cloud-ops-agent  
+```bash
+sudo systemctl restart google-cloud-ops-agent
+```
