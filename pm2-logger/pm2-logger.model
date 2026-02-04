@@ -6,7 +6,8 @@ input(type="imfile"
       File="/root/.pm2/logs/modelo-out.log"
       Tag="pm2-modelo"
       Severity="info"
-      Facility="local0")
+      Facility="local0"
+      reopenOnTruncate="on")
 
 # --- Log de Erro (ERROR) ---
 # Ajuste o nome do arquivo se necessário
@@ -14,4 +15,5 @@ input(type="imfile"
       File="/root/.pm2/logs/modelo-error.log"
       Tag="pm2-modelo-err"
       Severity="error"
-      Facility="local0")
+      Facility="local0"
+      reopenOnTruncate="on")
